@@ -2,8 +2,7 @@ from collections import deque
 import logging
 from typing import Dict, Optional, Sequence, Tuple
 
-import gym
-import gym.spaces
+import gymnasium as gym
 import jax
 import numpy as np
 import tensorflow as tf

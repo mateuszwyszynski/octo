@@ -8,7 +8,7 @@ from typing import Any, Dict, Optional
 
 import dlimp as dl
 import flax
-import gym
+import gymnasium as gym
 import jax
 import jax.numpy as jnp
 from matplotlib.backends.backend_agg import FigureCanvasAgg as FigureCanvas

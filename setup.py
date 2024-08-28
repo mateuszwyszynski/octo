@@ -1,3 +1,3 @@
-from setuptools import find_packages, setup
+from setuptools import setup
 
-setup(name="octo", packages=find_packages())
+setup(name="octo", packages=["octo"])

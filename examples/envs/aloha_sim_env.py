@@ -2,7 +2,7 @@ import copy
 from typing import List
 
 import dlimp as dl
-import gym
+import gymnasium as gym
 import jax.numpy as jnp
 import numpy as np
 

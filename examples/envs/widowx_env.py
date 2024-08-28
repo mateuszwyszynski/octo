@@ -1,6 +1,6 @@
 import time
 
-import gym
+import gymnasium as gym
 import numpy as np
 from pyquaternion import Quaternion
 from widowx_envs.widowx_env_service import WidowXClient
