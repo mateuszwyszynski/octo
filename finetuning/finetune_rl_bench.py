@@ -72,6 +72,8 @@ def main(_):
             image_obs_keys={"primary": "image", "wrist": "wrist_image"},
             proprio_obs_key="proprio",
             language_key="language_instruction",
+            # We want to avoid normalizing the gripper
+            action_normalization_mask=[True, True, True, True, True, True, False],
         ),
         traj_transform_kwargs=dict(
             window_size=1,

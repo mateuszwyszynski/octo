@@ -29,6 +29,7 @@ from rlbench.utils import name_to_task_class
 import wandb
 import wandb.plot
 
+from finetuning.envs.action_modes import UR5ActionMode
 from finetuning.envs.rl_bench_env_adapter import RLBenchEnvAdapter  # noqa
 from finetuning.envs.rl_bench_ur5_env import RLBenchUR5Env
 from octo.model.octo_model import OctoModel
