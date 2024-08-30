@@ -29,9 +29,9 @@ from rlbench.utils import name_to_task_class
 import wandb
 import wandb.plot
 
-from finetuning.envs.action_modes import UR5ActionMode
-from finetuning.envs.rl_bench_env_adapter import RLBenchEnvAdapter  # noqa
-from finetuning.envs.rl_bench_ur5_env import RLBenchUR5Env
+from envs.action_modes import UR5ActionMode
+from envs.rl_bench_env_adapter import RLBenchEnvAdapter  # noqa
+from envs.rl_bench_ur5_env import RLBenchUR5Env
 from octo.model.octo_model import OctoModel
 from octo.utils.gym_wrappers import HistoryWrapper, NormalizeProprio, RHCWrapper
 from octo.utils.train_callbacks import supply_rng
@@ -48,7 +48,7 @@ flags.DEFINE_enum(
     "task",
     "place_shape_in_shape_sorter",
     help="Type of a task.",
-    enum_values=["place_shape_in_shape_sorter", "pick_and_lift"],
+    enum_values=["place_shape_in_shape_sorter", "pick_and_lift", "reach_target"],
 )
 flags.DEFINE_integer(
     "variation",
@@ -90,7 +90,7 @@ def main(_):
     gym.register(
         task_name,
         entry_point=lambda: RLBenchEnvAdapter(
-            RLBenchUR5Env(task_class=name_to_task_class("place_shape_in_shape_sorter"),
+            RLBenchUR5Env(task_class=name_to_task_class(FLAGS.task),
                     observation_mode='vision',
                     render_mode="rgb_array",
                     robot_setup="ur5",
@@ -127,7 +127,7 @@ def main(_):
         images = [info["frame"]]
         episode_return = 0.0
 
-        while len(images) < 200:
+        while len(images) < 100:
             # model returns actions of shape [batch, pred_horizon, action_dim] -- remove batch
             actions = policy_fn(jax.tree_map(lambda x: x[None], obs), task)
             actions = actions[0]
