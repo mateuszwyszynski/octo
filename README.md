@@ -73,7 +73,7 @@ You can evaluate the model with the `finetuning/evaluate_rl_bench.py` script.
 Example usage:
 
 ```bash
-python finetuning/evaluate_rl_bench.py --finetuned_path=<path/to/the/checkpoint>
+python3 finetuning/evaluate_rl_bench.py --finetuned_path=<path/to/the/checkpoint>
 ```
 
 ---
