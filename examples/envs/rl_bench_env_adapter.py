@@ -7,7 +7,7 @@ import jax.numpy as jnp
 import numpy as np
 from PIL import Image
 
-from .rl_bench_ur5_env import RLBenchUR5Env
+from ...examples.envs.rl_bench_ur5_env import RLBenchUR5Env
 
 
 # TODO: This class made sense, when we used RLBenchEnv. While we are using our own RLBenchUR5Env,
