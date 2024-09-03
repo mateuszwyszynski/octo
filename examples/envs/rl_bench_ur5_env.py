@@ -1,7 +1,10 @@
+import dlimp as dl
+from PIL import Image
 from typing import Union
 
 import numpy as np
 from gymnasium import spaces
+import gymnasium as gym
 from pyrep.objects.dummy import Dummy
 from pyrep.objects.vision_sensor import VisionSensor
 from pyrep.const import RenderMode
@@ -17,8 +20,13 @@ class RLBenchUR5Env(RLBenchEnv):
     """An gym wrapper for RLBench."""
     metadata = {"render_modes": ["human", "rgb_array"], "render_fps": 4}
 
-    def __init__(self, task_class, observation_mode='state',
-                 render_mode: Union[None, str] = None, action_mode=None, robot_setup: str="panda", headless: bool=True):
+
+    def __init__(
+            self, task_class, observation_mode='state',
+            render_mode: Union[None, str] = None, action_mode=None,
+            robot_setup: str="panda", headless: bool=True,
+            im_size: int = 256, proprio: bool = True, seed: int = 1234,
+            ):
         self.task_class = task_class
         self.observation_mode = observation_mode
         assert render_mode is None or render_mode in self.metadata["render_modes"]
@@ -76,6 +84,30 @@ class RLBenchUR5Env(RLBenchEnv):
         self.action_space = spaces.Box(
             low=np.float32(action_low), high=np.float32(action_high), shape=self.rlbench_env.action_shape, dtype=np.float32)
 
+        self.proprio = proprio
+
+        observation_space_dict = {
+            **{
+                f"image_{i}": gym.spaces.Box(
+                    low=np.zeros((im_size, im_size, 3)),
+                    high=255 * np.ones((im_size, im_size, 3)),
+                    dtype=np.uint8,
+                )
+                for i in ["primary", "wrist"]
+            },
+        }
+        if proprio:
+            observation_space_dict["proprio"] = gym.spaces.Box(
+                low=-np.infty * np.ones(7),
+                high=np.infty * np.ones(7),
+                dtype=np.float32,
+            )
+
+        self.observation_space = gym.spaces.Dict(observation_space_dict)
+        self._im_size = im_size
+        self._rng = np.random.default_rng(seed)
+
+
     def _extract_obs(self, rlbench_obs):
         gym_obs = {} 
         for state_name in ["joint_velocities", "joint_positions", "joint_forces", "gripper_open", "gripper_pose", "gripper_joint_positions", "gripper_touch_forces", "task_low_dim_state"]:
@@ -94,3 +126,75 @@ class RLBenchUR5Env(RLBenchEnv):
                 "front_rgb": rlbench_obs.front_rgb,
             })
         return gym_obs
+
+
+    def step(self, action):
+        observation, reward, terminated, _, _ = super().step(action)
+        obs = self.extract_obs(observation)
+
+        # It assumes that reward == 1.0 means success
+        if reward == 1.0:
+            self._episode_is_success = 1
+
+        rendered_frame = self.render(obs)
+
+        return obs, reward, terminated, False, {"frame": rendered_frame}
+
+
+    def render(self, obs=None):
+        rendered_frame = super().render()
+
+        if rendered_frame is not None:
+
+            wrist_img = Image.fromarray(obs["image_wrist"].numpy())
+            wrist_img = wrist_img.resize((360, 360), Image.Resampling.BILINEAR)
+            resized_wrist_img = np.array(wrist_img)
+
+            return np.concatenate([rendered_frame, resized_wrist_img], axis=1)
+
+
+    def reset(self, **kwargs):
+        if kwargs["options"]["variation"] == -1:
+            self.rlbench_task_env.sample_variation()
+        else:
+            self.rlbench_task_env.set_variation(kwargs["options"]["variation"])
+
+        obs, info = super().reset(**kwargs)
+
+        obs = self.extract_obs(obs)
+        self._episode_is_success = 0
+        self.language_instruction = info["text_descriptions"]
+
+        rendered_frame = self.render(obs)
+
+        return obs, {"frame": rendered_frame}
+
+
+    def extract_obs(self, obs):
+        curr_obs = {
+            "image_primary": obs["front_rgb"],
+            "image_wrist": obs["wrist_rgb"],
+        }
+
+        if self.proprio:
+            curr_obs["proprio"] = np.concatenate(
+                [obs["joint_positions"], obs["gripper_open"]]
+            )
+
+        curr_obs = dl.transforms.resize_images(
+            curr_obs, match=curr_obs.keys(), size=(self._im_size, self._im_size)
+        )
+
+        return curr_obs
+
+
+    def get_task(self):
+        return {
+            "language_instruction": [self.language_instruction],
+        }
+
+
+    def get_episode_metrics(self):
+        return {
+            "success_rate": self._episode_is_success,
+        }

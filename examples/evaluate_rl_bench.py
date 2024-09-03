@@ -18,7 +18,6 @@ To run this script, run:
 
 from functools import partial
 import random
-import sys
 
 from absl import app, flags, logging
 import gymnasium as gym
@@ -30,7 +29,6 @@ import wandb
 import wandb.plot
 
 from envs.action_modes import UR5ActionMode
-from envs.rl_bench_env_adapter import RLBenchEnvAdapter  # noqa
 from envs.rl_bench_ur5_env import RLBenchUR5Env
 from octo.model.octo_model import OctoModel
 from octo.utils.gym_wrappers import HistoryWrapper, NormalizeProprio, RHCWrapper
@@ -89,15 +87,12 @@ def main(_):
 
     gym.register(
         task_name,
-        entry_point=lambda: RLBenchEnvAdapter(
-            RLBenchUR5Env(task_class=name_to_task_class(FLAGS.task),
-                    observation_mode='vision',
-                    render_mode="rgb_array",
-                    robot_setup="ur5",
-                    headless=True,
-                    action_mode=UR5ActionMode()),
-            proprio=use_proprio
-        ),
+        entry_point=lambda: RLBenchUR5Env(
+            task_class=name_to_task_class(FLAGS.task),
+            observation_mode='vision', render_mode="rgb_array",
+            robot_setup="ur5", headless=True,
+            action_mode=UR5ActionMode(), proprio=use_proprio
+            )
     )
 
     env = gym.make(task_name)
