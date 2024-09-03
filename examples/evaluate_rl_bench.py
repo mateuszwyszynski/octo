@@ -97,6 +97,8 @@ def main(_):
 
     env = gym.make(task_name)
 
+    env = NormalizeProprio(env, model.dataset_statistics)
+
     # add wrappers for history and "receding horizon control", i.e. action chunking
     env = HistoryWrapper(env, horizon=1)
     env = RHCWrapper(env, exec_horizon=FLAGS.action_horizon)
