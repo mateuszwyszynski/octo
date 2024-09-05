@@ -20,26 +20,29 @@ from functools import partial
 import random
 
 from absl import app, flags, logging
+from envs.action_modes import UR5ActionMode
+from envs.rl_bench_ur5_env import RLBenchUR5Env
 import gymnasium as gym
+import imageio
 import jax
 from matplotlib import pyplot as plt
 import numpy as np
 from rlbench.utils import name_to_task_class
-import wandb
 import wandb.plot
 
-from envs.action_modes import UR5ActionMode
-from envs.rl_bench_ur5_env import RLBenchUR5Env
 from octo.model.octo_model import OctoModel
 from octo.utils.gym_wrappers import HistoryWrapper, NormalizeProprio, RHCWrapper
 from octo.utils.train_callbacks import supply_rng
+import wandb
 
 FLAGS = flags.FLAGS
 
 flags.DEFINE_string(
     "finetuned_path", None, "Path to finetuned Octo checkpoint directory."
 )
-flags.DEFINE_integer("checkpoint_step", None, "Step of the checkpoint used for evaluation.")
+flags.DEFINE_integer(
+    "checkpoint_step", None, "Step of the checkpoint used for evaluation."
+)
 flags.DEFINE_integer("action_horizon", 50, "Action horizon.")
 flags.DEFINE_integer("rollouts", 3, "Number of evaluation rollouts.")
 flags.DEFINE_enum(
@@ -53,6 +56,35 @@ flags.DEFINE_integer(
     -1,
     help="Variation number. A value of -1 means that the variation is randomly sampled at each simulation reset. Variation numbers start from 0.",
 )
+flags.DEFINE_bool("headless", True, "Whether to start the simulator in headless mode.")
+flags.DEFINE_bool(
+    "record_video",
+    False,
+    "Whether to save the video of evaluation in 'outputs' directory.",
+)
+flags.DEFINE_integer(
+    "steps", 200, "Number of maximum simulation steps in one evaluation run."
+)
+
+
+def convert_images_to_video(image_array, output_path, fps=30):
+    """
+    Converts a sequence of images (NumPy array) to an MP4 video using imageio.
+
+    Parameters:
+    - image_array: NumPy array of shape (num_frames, height, width, channels)
+    - output_path: Path where the output video will be saved (e.g., 'output.mp4')
+    - fps: Frames per second of the output video
+    """
+    # Initialize the video writer
+    writer = imageio.get_writer(output_path, fps=fps, codec="libx264", format="mp4")
+
+    # Write each frame to the video file
+    for frame in image_array:
+        writer.append_data(frame)
+
+    # Close the writer to finalize the file
+    writer.close()
 
 
 def main(_):
@@ -81,7 +113,7 @@ def main(_):
     #   }
     ##################################################################################################################
     use_proprio = "proprio" in model.config["model"]["observation_tokenizers"]
-    task_name = f"{FLAGS['task'].value}-vision-v0"
+    task_name = f"{FLAGS.task}-vision-v0"
     if use_proprio:
         task_name = f"{task_name}-proprio"
 
@@ -89,10 +121,13 @@ def main(_):
         task_name,
         entry_point=lambda: RLBenchUR5Env(
             task_class=name_to_task_class(FLAGS.task),
-            observation_mode='vision', render_mode="rgb_array",
-            robot_setup="ur5", headless=True,
-            action_mode=UR5ActionMode(), proprio=use_proprio
-            )
+            observation_mode="vision",
+            render_mode="rgb_array",
+            robot_setup="ur5",
+            headless=FLAGS.headless,
+            action_mode=UR5ActionMode(),
+            proprio=use_proprio,
+        ),
     )
 
     env = gym.make(task_name)
@@ -113,7 +148,7 @@ def main(_):
 
     # running rollouts
     actions_made = []
-    for _ in range(FLAGS.rollouts):
+    for i in range(FLAGS.rollouts):
         obs, info = env.reset(options={"variation": FLAGS["variation"].value})
 
         # create task specification --> use model utility to create task dict with correct entries
@@ -124,13 +159,13 @@ def main(_):
         images = [info["frame"]]
         episode_return = 0.0
 
-        while len(images) < 100:
+        while len(images) < FLAGS.steps:
             # model returns actions of shape [batch, pred_horizon, action_dim] -- remove batch
             actions = policy_fn(jax.tree_map(lambda x: x[None], obs), task)
             actions = actions[0]
             actions_made.append(actions[: FLAGS.action_horizon])
 
-            print(len(images), "Action", actions)
+            print(len(images), "Action", actions[: FLAGS.action_horizon])
 
             # step env -- info contains full "chunk" of observations for logging
             # obs only contains observation for final step of chunk
@@ -145,10 +180,14 @@ def main(_):
         wandb.log(
             {
                 sampled_language_instruction: wandb.Video(
-                    np.array(images).transpose(0, 3, 1, 2)[::2]
+                    np.array(images).transpose(0, 3, 1, 2)[::2], format="mp4", fps=15
                 )
             }
         )
+
+        if FLAGS.record_video:
+            images_array = np.array(images)
+            convert_images_to_video(images_array, f"outputs/{FLAGS.task}{i}.mp4", fps=30)
 
     actions_made = np.concatenate(actions_made, axis=0)
 
