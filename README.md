@@ -10,7 +10,48 @@ Otherwise, use [rlbench_dataset_builder](https://github.com/mateuszwyszynski/rlb
 
 ## Environment Setup
 
-In a virtual environment:
+### Installation with `conda`
+
+1. Install octo and necessary dependencies:
+
+```bash
+conda create -n octo python=3.10
+conda activate octo
+pip install -e .
+pip install -r requirements.txt
+```
+For GPU:
+```bash
+pip install --upgrade "jax[cuda11_pip]==0.4.20" -f https://storage.googleapis.com/jax-releases/jax_cuda_releases.html
+```
+
+For TPU
+```bash
+pip install --upgrade "jax[tpu]==0.4.20" -f https://storage.googleapis.com/jax-releases/libtpu_releases.html
+```
+See the [Jax Github page](https://github.com/google/jax) for more details on installing Jax.
+
+Test the installation by finetuning on the debug dataset:
+```bash
+python scripts/finetune.py --config.pretrained_path=hf://rail-berkeley/octo-small-1.5 --debug
+```
+
+2. Install [RLBench](https://github.com/stepjam/RLBench?tab=readme-ov-file#install).
+To set environment variables necessary to use CoppeliaSim run in the active conda environment:
+
+```bash
+conda env config vars set COPPELIASIM_ROOT=${HOME}/CoppeliaSim
+conda env config vars set LD_LIBRARY_PATH=$LD_LIBRARY_PATH:$COPPELIASIM_ROOT
+conda env config vars set QT_QPA_PLATFORM_PLUGIN_PATH=$COPPELIASIM_ROOT
+```
+
+3. Install gymnasium:
+
+```bash
+pip install gymnasium
+```
+
+### Installation with `pip`
 
 1. Install octo and necessary dependencies:
 
@@ -56,11 +97,11 @@ export QT_QPA_PLATFORM_PLUGIN_PATH=$COPPELIASIM_ROOT
 
 ## Training
 
-Training is performed using `finetuning/finetune_rl_bench.py` script.
+Training is performed using `examples/finetune_rl_bench.py` script.
 Example usage:
 
 ```bash
-python3 finetuning/finetune_rl_bench.py \
+python3 examples/finetune_rl_bench.py \
   --pretrained_path=hf://rail-berkeley/octo-base-1.5 \
   --data_dir=</absolute/path/to/tensorflow_datasets> \
   --save_dir=</absolute/path/where/the/checkpoints/will/be/saved> \
@@ -69,11 +110,11 @@ python3 finetuning/finetune_rl_bench.py \
 
 ## Evaluation
 
-You can evaluate the model with the `finetuning/evaluate_rl_bench.py` script.
+You can evaluate the model with the `examples/evaluate_rl_bench.py` script.
 Example usage:
 
 ```bash
-python3 finetuning/evaluate_rl_bench.py --finetuned_path=<path/to/the/checkpoint>
+python3 examples/evaluate_rl_bench.py --finetuned_path=<path/to/the/checkpoint>
 ```
 
 ---
