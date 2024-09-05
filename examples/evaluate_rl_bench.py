@@ -56,7 +56,7 @@ flags.DEFINE_integer(
     -1,
     help="Variation number. A value of -1 means that the variation is randomly sampled at each simulation reset. Variation numbers start from 0.",
 )
-flags.DEFINE_bool("headless", False, "Whether to start the simulator in headless mode.")
+flags.DEFINE_bool("headless", True, "Whether to start the simulator in headless mode.")
 flags.DEFINE_bool(
     "record_video",
     False,
