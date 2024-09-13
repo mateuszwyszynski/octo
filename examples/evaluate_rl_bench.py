@@ -1,26 +1,8 @@
-"""
-This script demonstrates how to load and rollout a finetuned Octo model.
-We use the Octo model finetuned on ALOHA sim data from the examples/02_finetune_new_observation_action.py script.
-
-For installing the ALOHA sim environment, clone: https://github.com/tonyzhaozh/act
-Then run:
-pip3 install opencv-python modern_robotics pyrealsense2 h5py_cache pyquaternion pyyaml rospkg pexpect mujoco==2.3.3 dm_control==1.0.9 einops packaging h5py
-
-Finally, modify the `sys.path.append` statement below to add the ACT repo to your path.
-If you are running this on a head-less server, start a virtual display:
-    Xvfb :1 -screen 0 1024x768x16 &
-    export DISPLAY=:1
-
-To run this script, run:
-    cd examples
-    python3 03_eval_finetuned.py --finetuned_path=<path_to_finetuned_octo_checkpoint>
-"""
-
 from functools import partial
 import random
 
 from absl import app, flags, logging
-from envs.action_modes import UR5ActionMode
+from envs.action_modes import DeltaEndEffectorPose
 from envs.rl_bench_ur5_env import RLBenchUR5Env
 import gymnasium as gym
 import imageio
@@ -49,7 +31,12 @@ flags.DEFINE_enum(
     "task",
     "place_shape_in_shape_sorter",
     help="Type of a task.",
-    enum_values=["place_shape_in_shape_sorter", "pick_and_lift", "reach_target"],
+    enum_values=[
+        "place_shape_in_shape_sorter",
+        "pick_and_lift",
+        "reach_target",
+        "pick_and_lift_easy",
+    ],
 )
 flags.DEFINE_integer(
     "variation",
@@ -65,6 +52,10 @@ flags.DEFINE_bool(
 flags.DEFINE_integer(
     "steps", 200, "Number of maximum simulation steps in one evaluation run."
 )
+flags.DEFINE_enum(
+    "robot_setup", "panda", help="Robot setup.", enum_values=["panda", "ur5"]
+)
+flags.DEFINE_enum("")
 
 
 def convert_images_to_video(image_array, output_path, fps=30):
@@ -123,16 +114,17 @@ def main(_):
             task_class=name_to_task_class(FLAGS.task),
             observation_mode="vision",
             render_mode="rgb_array",
-            robot_setup="ur5",
+            robot_setup=FLAGS.robot_setup,
             headless=FLAGS.headless,
-            action_mode=UR5ActionMode(),
+            action_mode=DeltaEndEffectorPose(),
             proprio=use_proprio,
         ),
     )
 
     env = gym.make(task_name)
 
-    env = NormalizeProprio(env, model.dataset_statistics)
+    if use_proprio:
+        env = NormalizeProprio(env, model.dataset_statistics)
 
     # add wrappers for history and "receding horizon control", i.e. action chunking
     env = HistoryWrapper(env, horizon=1)
@@ -187,7 +179,11 @@ def main(_):
 
         if FLAGS.record_video:
             images_array = np.array(images)
-            convert_images_to_video(images_array, f"outputs/{FLAGS.task}{i}.mp4", fps=30)
+            convert_images_to_video(
+                images_array,
+                f"outputs/{FLAGS.task}{i}_horizon_{FLAGS.action_horizon}.mp4",
+                fps=30,
+            )
 
     actions_made = np.concatenate(actions_made, axis=0)
 
